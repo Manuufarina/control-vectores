@@ -67,6 +67,11 @@ async function agregarBarrio() {
 
 function mostrarFormularioCliente() {
     document.getElementById('formClienteContainer').style.display = 'block';
+    
+    // Ocultar otros formularios si están abiertos
+    document.getElementById('formOrdenContainer').style.display = 'none';
+    document.getElementById('formVisitaContainer').style.display = 'none';
+    
     cargarBarrios();
 }
 
@@ -105,13 +110,6 @@ async function verificarDniExistente() {
         }
     }
 }
-
-document.addEventListener('DOMContentLoaded', function() {
-    // Añadir evento para verificar DNI en tiempo real
-    if (document.getElementById('dniCliente')) {
-        document.getElementById('dniCliente').addEventListener('input', verificarDniExistente);
-    }
-});
 
 document.getElementById('formCliente').addEventListener('submit', async function(e) {
     e.preventDefault();
@@ -153,36 +151,45 @@ document.getElementById('formCliente').addEventListener('submit', async function
     }
 });
 
-// Función para cargar todos los clientes al iniciar la página
+// Función mejorada para cargar todos los clientes
 async function cargarTodosLosClientes() {
+    console.log('Iniciando carga de todos los clientes...');
     try {
+        // Mostrar mensaje de carga
+        const lista = document.getElementById('listaClientes');
+        lista.innerHTML = '<p>Cargando clientes...</p>';
+        
         // Hacer una solicitud para obtener todos los clientes
+        console.log('Haciendo fetch a /api/clientes/todos');
         const response = await fetch('/api/clientes/todos');
         
         if (!response.ok) {
+            console.error('Error en la respuesta:', response.status, response.statusText);
             throw new Error(`Error ${response.status}: ${response.statusText}`);
         }
         
         const clientes = await response.json();
-        
-        // Mostrar los clientes en la lista
-        const lista = document.getElementById('listaClientes');
+        console.log(`Se obtuvieron ${clientes.length} clientes`);
         
         if (clientes.length === 0) {
+            console.log('No hay clientes para mostrar');
             lista.innerHTML = '<p>No hay clientes registrados.</p>';
             return;
         }
         
+        console.log('Renderizando la lista de clientes');
         lista.innerHTML = clientes.map(c => 
             `<p>${c.nombre} (Código: ${c.codigo}, DNI: ${c.dni}${c.barrio ? ', Barrio: ' + c.barrio : ''}) <button class="material-btn" onclick="verFichaCliente(${c.id})"><span class="material-icons">visibility</span> Ver Ficha</button></p>`
         ).join('');
+        console.log('Lista de clientes renderizada exitosamente');
     } catch (error) {
         console.error('Error al cargar todos los clientes:', error);
+        document.getElementById('listaClientes').innerHTML = '<p>Error al cargar clientes. <button class="material-btn" onclick="cargarTodosLosClientes()">Reintentar</button></p>';
         showNotification('Error al cargar los clientes: ' + error.message, true);
     }
 }
 
-// Reemplaza la función buscarCliente con esta versión mejorada
+// Versión mejorada de la función buscarCliente
 async function buscarCliente() {
     const query = document.getElementById('buscarCliente').value.trim();
     
@@ -193,13 +200,16 @@ async function buscarCliente() {
             return;
         }
         
+        // Mostrar mensaje de carga
+        const lista = document.getElementById('listaClientes');
+        lista.innerHTML = '<p>Buscando clientes...</p>';
+        
         const response = await fetch(`/api/clientes/buscar?q=${encodeURIComponent(query)}`);
         if (!response.ok) {
             throw new Error(`Error ${response.status}: ${response.statusText}`);
         }
         
         const clientes = await response.json();
-        const lista = document.getElementById('listaClientes');
         
         if (clientes.length === 0) {
             lista.innerHTML = '<p>No se encontraron clientes que coincidan con la búsqueda.</p>';
@@ -211,8 +221,16 @@ async function buscarCliente() {
         ).join('');
     } catch (error) {
         console.error('Error al buscar clientes:', error);
+        document.getElementById('listaClientes').innerHTML = '<p>Error al buscar clientes.</p>';
         showNotification('Error al buscar clientes: ' + error.message, true);
     }
+}
+
+// Función para cerrar la ficha del cliente
+function cerrarFichaCliente() {
+    document.getElementById('fichaCliente').style.display = 'none';
+    // Mostrar nuevamente la lista de clientes si no está visible
+    document.getElementById('clientes').style.display = 'block';
 }
 
 async function verFichaCliente(id) {
@@ -270,13 +288,21 @@ async function verFichaCliente(id) {
         </div>
     `).join('') || '<p>No hay órdenes registradas.</p>';
 
+    // Mostrar la ficha del cliente
     document.getElementById('fichaCliente').style.display = 'block';
+    
+    // No ocultar la lista de clientes en el nuevo diseño de dos columnas
+    // document.getElementById('clientes').style.display = 'none';
 }
 
 function mostrarFormularioOrden(idOrden = null, tipoServicio = '', abono = '', numeroRecibo = '', dependencia = '', horario = '', tecnicos = '', estado = 'Pendiente') {
     const formContainer = document.getElementById('formOrdenContainer');
     const titulo = document.getElementById('tituloFormOrden');
     const form = document.getElementById('formOrden');
+    
+    // Ocultar otros formularios si están abiertos
+    document.getElementById('formClienteContainer').style.display = 'none';
+    document.getElementById('formVisitaContainer').style.display = 'none';
     
     if (idOrden) {
         titulo.textContent = 'Editar Orden de Trabajo';
@@ -309,6 +335,10 @@ function mostrarFormularioVisita(idOrden, idVisita = null, fechaVisita = '', obs
     const formContainer = document.getElementById('formVisitaContainer');
     const titulo = document.getElementById('tituloFormVisita');
     const form = document.getElementById('formVisita');
+    
+    // Ocultar otros formularios si están abiertos
+    document.getElementById('formClienteContainer').style.display = 'none';
+    document.getElementById('formOrdenContainer').style.display = 'none';
     
     if (idVisita) {
         titulo.textContent = 'Editar Visita';
@@ -675,7 +705,9 @@ function cerrarFormularioOrden() {
     document.getElementById('campoDependencia').style.display = 'none';
 }
 
-
+/**
+ * Cierra el formulario de visita y reinicia sus campos
+ */
 function cerrarFormularioVisita() {
     // Ocultar el formulario
     document.getElementById('formVisitaContainer').style.display = 'none';
@@ -699,12 +731,22 @@ document.addEventListener('keydown', function(event) {
             cerrarFormularioOrden();
         } else if (document.getElementById('formVisitaContainer').style.display !== 'none') {
             cerrarFormularioVisita();
+        } else if (document.getElementById('fichaCliente').style.display !== 'none') {
+            cerrarFichaCliente();
         }
     }
 });
 
-// Modificar la función window.onload para que cargue todos los clientes
-window.onload = function() {
+// Inicialización cuando el DOM está listo
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM cargado - iniciando aplicación');
+    
+    // Agregar evento para verificar DNI en tiempo real
+    if (document.getElementById('dniCliente')) {
+        document.getElementById('dniCliente').addEventListener('input', verificarDniExistente);
+    }
+    
+    // Cargar datos iniciales
+    cargarTodosLosClientes();
     cargarEstadisticas();
-    cargarTodosLosClientes(); // Añadir esta línea para mostrar todos los clientes al inicio
-};
+});
