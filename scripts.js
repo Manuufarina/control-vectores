@@ -10,6 +10,7 @@ function showNotification(message, isError = false) {
     notification.textContent = message;
     container.appendChild(notification);
     
+    // Aumenta el tiempo de visualización de las notificaciones a 5 segundos
     setTimeout(() => notification.remove(), 5000);
 }
 
@@ -67,46 +68,55 @@ async function agregarBarrio() {
 function mostrarFormularioCliente() {
     document.getElementById('formClienteContainer').style.display = 'block';
     cargarBarrios();
-    document.getElementById('dniCliente').addEventListener('input', verificarDniExistente);
 }
 
-function cerrarFormularioCliente() {
-    document.getElementById('formClienteContainer').style.display = 'none';
-    document.getElementById('formCliente').reset();
-    const inputs = document.querySelectorAll('#formCliente input, #formCliente select');
-    inputs.forEach(input => {
-        input.style.borderColor = '';
-    });
-    const dniWarning = document.getElementById('dniWarning');
-    if (dniWarning) {
-        dniWarning.remove();
+// Función para verificar DNI mientras el usuario escribe
+async function verificarDniExistente() {
+    const dni = document.getElementById('dniCliente').value.trim();
+    if (dni.length > 5) { // Verificar solo si el DNI tiene suficientes caracteres
+        try {
+            const response = await fetch(`/api/clientes/verificar-dni/${dni}`);
+            const data = await response.json();
+            
+            const dniInput = document.getElementById('dniCliente');
+            const warningElement = document.getElementById('dniWarning');
+            
+            if (data.exists) {
+                // Si el DNI ya existe, mostrar advertencia
+                if (!warningElement) {
+                    const warning = document.createElement('div');
+                    warning.id = 'dniWarning';
+                    warning.className = 'warning-text';
+                    warning.style.color = 'red';
+                    warning.style.marginTop = '5px';
+                    warning.innerHTML = `¡Este DNI ya está registrado! <a href="#" onclick="verFichaCliente(${data.clienteId}); return false;">Ver cliente existente</a>`;
+                    dniInput.parentNode.appendChild(warning);
+                }
+                dniInput.style.borderColor = 'red';
+            } else {
+                // Si el DNI no existe, quitar advertencia si existe
+                if (warningElement) {
+                    warningElement.remove();
+                }
+                dniInput.style.borderColor = '';
+            }
+        } catch (error) {
+            console.error('Error al verificar DNI:', error);
+        }
     }
-    document.getElementById('nuevoBarrioContainer').style.display = 'none';
 }
 
-function cerrarFormularioOrden() {
-    document.getElementById('formOrdenContainer').style.display = 'none';
-    document.getElementById('formOrden').reset();
-    const inputs = document.querySelectorAll('#formOrden input, #formOrden select');
-    inputs.forEach(input => {
-        input.style.borderColor = '';
-    });
-    document.getElementById('campoRecibo').style.display = 'none';
-    document.getElementById('campoDependencia').style.display = 'none';
-}
-
-function cerrarFormularioVisita() {
-    document.getElementById('formVisitaContainer').style.display = 'none';
-    document.getElementById('formVisita').reset();
-    const inputs = document.querySelectorAll('#formVisita input, #formVisita textarea');
-    inputs.forEach(input => {
-        input.style.borderColor = '';
-    });
-}
+document.addEventListener('DOMContentLoaded', function() {
+    // Añadir evento para verificar DNI en tiempo real
+    if (document.getElementById('dniCliente')) {
+        document.getElementById('dniCliente').addEventListener('input', verificarDniExistente);
+    }
+});
 
 document.getElementById('formCliente').addEventListener('submit', async function(e) {
     e.preventDefault();
     
+    // Verificar DNI antes de enviar
     const dni = document.getElementById('dniCliente').value.trim();
     const response = await fetch(`/api/clientes/verificar-dni/${dni}`);
     const data = await response.json();
@@ -135,21 +145,74 @@ document.getElementById('formCliente').addEventListener('submit', async function
     
     if (submitResponse.ok) {
         showNotification(`Cliente creado con código: ${result.codigo}`);
-        cerrarFormularioCliente();
+        document.getElementById('formClienteContainer').style.display = 'none';
+        document.getElementById('formCliente').reset();
         buscarCliente();
     } else {
         showNotification(result.error, true);
     }
 });
 
+// Función para cargar todos los clientes al iniciar la página
+async function cargarTodosLosClientes() {
+    try {
+        // Hacer una solicitud para obtener todos los clientes
+        const response = await fetch('/api/clientes/todos');
+        
+        if (!response.ok) {
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+        
+        const clientes = await response.json();
+        
+        // Mostrar los clientes en la lista
+        const lista = document.getElementById('listaClientes');
+        
+        if (clientes.length === 0) {
+            lista.innerHTML = '<p>No hay clientes registrados.</p>';
+            return;
+        }
+        
+        lista.innerHTML = clientes.map(c => 
+            `<p>${c.nombre} (Código: ${c.codigo}, DNI: ${c.dni}${c.barrio ? ', Barrio: ' + c.barrio : ''}) <button class="material-btn" onclick="verFichaCliente(${c.id})"><span class="material-icons">visibility</span> Ver Ficha</button></p>`
+        ).join('');
+    } catch (error) {
+        console.error('Error al cargar todos los clientes:', error);
+        showNotification('Error al cargar los clientes: ' + error.message, true);
+    }
+}
+
+// Reemplaza la función buscarCliente con esta versión mejorada
 async function buscarCliente() {
-    const query = document.getElementById('buscarCliente').value;
-    const response = await fetch(`/api/clientes/buscar?q=${query}`);
-    const clientes = await response.json();
-    const lista = document.getElementById('listaClientes');
-    lista.innerHTML = clientes.map(c => 
-        `<p>${c.nombre} (Código: ${c.codigo}, DNI: ${c.dni}${c.barrio ? ', Barrio: ' + c.barrio : ''}) <button class="material-btn" onclick="verFichaCliente(${c.id})"><span class="material-icons">visibility</span> Ver Ficha</button></p>`
-    ).join('');
+    const query = document.getElementById('buscarCliente').value.trim();
+    
+    try {
+        // Si no hay texto de búsqueda, mostrar todos los clientes
+        if (!query) {
+            await cargarTodosLosClientes();
+            return;
+        }
+        
+        const response = await fetch(`/api/clientes/buscar?q=${encodeURIComponent(query)}`);
+        if (!response.ok) {
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+        
+        const clientes = await response.json();
+        const lista = document.getElementById('listaClientes');
+        
+        if (clientes.length === 0) {
+            lista.innerHTML = '<p>No se encontraron clientes que coincidan con la búsqueda.</p>';
+            return;
+        }
+        
+        lista.innerHTML = clientes.map(c => 
+            `<p>${c.nombre} (Código: ${c.codigo}, DNI: ${c.dni}${c.barrio ? ', Barrio: ' + c.barrio : ''}) <button class="material-btn" onclick="verFichaCliente(${c.id})"><span class="material-icons">visibility</span> Ver Ficha</button></p>`
+        ).join('');
+    } catch (error) {
+        console.error('Error al buscar clientes:', error);
+        showNotification('Error al buscar clientes: ' + error.message, true);
+    }
 }
 
 async function verFichaCliente(id) {
@@ -233,6 +296,7 @@ function mostrarFormularioOrden(idOrden = null, tipoServicio = '', abono = '', n
         document.getElementById('idClienteOrden').value = document.getElementById('datosCliente').dataset.id;
         document.getElementById('estadoOrden').value = 'Pendiente';
         
+        // Establecer valor predeterminado para abono
         if (document.querySelector('input[name="abono"][value="no"]')) {
             document.querySelector('input[name="abono"][value="no"]').checked = true;
             toggleCamposAbono('no');
@@ -265,6 +329,7 @@ document.getElementById('formOrden').addEventListener('submit', async function(e
     try {
         const idOrden = document.getElementById('idOrden').value;
         
+        // Verificar que se haya seleccionado una opción de abono
         const abonoChecked = document.querySelector('input[name="abono"]:checked');
         if (!abonoChecked) {
             showNotification('Debe seleccionar si abonó o no', true);
@@ -274,11 +339,13 @@ document.getElementById('formOrden').addEventListener('submit', async function(e
         const abono = abonoChecked.value;
         const numeroRecibo = document.getElementById('numeroRecibo').value;
         
+        // Validar que haya número de recibo si abonó
         if (abono === 'sí' && (!numeroRecibo || numeroRecibo.trim() === '')) {
             showNotification('El número de recibo es obligatorio si se abona', true);
             return;
         }
         
+        // Preparar datos del formulario
         const data = {
             tipo_servicio: document.getElementById('tipoServicio').value,
             abono,
@@ -289,6 +356,7 @@ document.getElementById('formOrden').addEventListener('submit', async function(e
             estado: document.getElementById('estadoOrden').value
         };
         
+        // Si es una orden nueva, agregar el id del cliente
         if (!idOrden) {
             data.id_cliente = document.getElementById('idClienteOrden').value;
             if (!data.id_cliente) {
@@ -297,15 +365,18 @@ document.getElementById('formOrden').addEventListener('submit', async function(e
             }
         }
         
+        // Preparar URL y método según sea crear o editar
         const url = idOrden ? `/api/ordenes/${idOrden}` : '/api/ordenes';
         const method = idOrden ? 'PUT' : 'POST';
 
+        // Enviar solicitud al servidor
         const response = await fetch(url, {
             method,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
         
+        // Verificar si la respuesta es exitosa
         if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.error || `Error del servidor: ${response.status}`);
@@ -313,8 +384,11 @@ document.getElementById('formOrden').addEventListener('submit', async function(e
         
         const result = await response.json();
         
+        // Mostrar mensaje de éxito y actualizar la vista
         showNotification(result.message || 'Operación completada con éxito');
-        cerrarFormularioOrden();
+        document.getElementById('formOrdenContainer').style.display = 'none';
+        
+        // Actualizar la vista del cliente y estadísticas
         const clienteId = document.getElementById('datosCliente').dataset.id;
         await verFichaCliente(clienteId);
         await cargarEstadisticas();
@@ -346,7 +420,7 @@ document.getElementById('formVisita').addEventListener('submit', async function(
     const result = await response.json();
     if (response.ok) {
         showNotification(result.message);
-        cerrarFormularioVisita();
+        document.getElementById('formVisitaContainer').style.display = 'none';
         verFichaCliente(document.getElementById('datosCliente').dataset.id);
 
         const eventStart = new Date(fechaVisita).toISOString();
@@ -393,7 +467,6 @@ function toggleCamposAbono(abono) {
     document.getElementById('campoRecibo').style.display = abono === 'sí' ? 'block' : 'none';
     document.getElementById('campoDependencia').style.display = abono === 'no' ? 'block' : 'none';
 }
-
 document.querySelectorAll('input[name="abono"]').forEach(radio => {
     radio.addEventListener('change', function() {
         toggleCamposAbono(this.value);
@@ -468,15 +541,18 @@ async function cargarEstadisticas() {
         
         const data = await response.json();
 
+        // Verificar que todos los datos necesarios estén disponibles
         if (!data || !data.porTipoServicio || !Array.isArray(data.porTipoServicio)) {
             showNotification('Datos de estadísticas incompletos', true);
             return;
         }
 
+        // Destruir gráficos existentes si los hay
         if (chartPagos) chartPagos.destroy();
         if (chartServicios) chartServicios.destroy();
         if (chartTecnicos) chartTecnicos.destroy();
 
+        // Calcular pagados con verificación de datos
         const sinPago = data.sinPago || 0;
         const eximidos = data.eximidos || 0;
         const totalServicios = data.porTipoServicio.reduce((sum, item) => sum + (item.cantidad || 0), 0);
@@ -499,6 +575,7 @@ async function cargarEstadisticas() {
             }
         });
 
+        // Verificar que haya datos de servicios para mostrar
         if (data.porTipoServicio && data.porTipoServicio.length > 0) {
             const ctxServicios = document.getElementById('chartServicios').getContext('2d');
             chartServicios = new Chart(ctxServicios, {
@@ -522,6 +599,7 @@ async function cargarEstadisticas() {
             });
         }
 
+        // Verificar que haya datos de técnicos para mostrar
         if (data.tecnicosActivos && data.tecnicosActivos.length > 0) {
             const ctxTecnicos = document.getElementById('chartTecnicos').getContext('2d');
             chartTecnicos = new Chart(ctxTecnicos, {
@@ -550,49 +628,83 @@ async function cargarEstadisticas() {
     }
 }
 
-async function verificarDniExistente() {
-    const dni = document.getElementById('dniCliente').value.trim();
-    if (dni.length > 5) {
-        try {
-            const response = await fetch(`/api/clientes/verificar-dni/${dni}`);
-            const data = await response.json();
-            
-            const dniInput = document.getElementById('dniCliente');
-            const warningElement = document.getElementById('dniWarning');
-            
-            if (data.exists) {
-                if (!warningElement) {
-                    const warning = document.createElement('div');
-                    warning.id = 'dniWarning';
-                    warning.className = 'warning-text';
-                    warning.style.color = 'red';
-                    warning.style.marginTop = '5px';
-                    warning.innerHTML = `¡Este DNI ya está registrado! <a href="#" onclick="verFichaCliente(${data.clienteId}); return false;">Ver cliente existente</a>`;
-                    dniInput.parentNode.appendChild(warning);
-                }
-                dniInput.style.borderColor = 'red';
-            } else {
-                if (warningElement) {
-                    warningElement.remove();
-                }
-                dniInput.style.borderColor = '';
-            }
-        } catch (error) {
-            console.error('Error al verificar DNI:', error);
-        }
+/**
+ * Cierra el formulario de cliente y reinicia sus campos
+ */
+function cerrarFormularioCliente() {
+    // Ocultar el formulario
+    document.getElementById('formClienteContainer').style.display = 'none';
+    
+    // Reiniciar el formulario
+    document.getElementById('formCliente').reset();
+    
+    // Eliminar cualquier estilo de error en los campos
+    const inputs = document.querySelectorAll('#formCliente input, #formCliente select');
+    inputs.forEach(input => {
+        input.style.borderColor = '';
+    });
+    
+    // Eliminar advertencias que puedan existir
+    const dniWarning = document.getElementById('dniWarning');
+    if (dniWarning) {
+        dniWarning.remove();
     }
+    
+    // Cerrar el contenedor de nuevo barrio si está abierto
+    document.getElementById('nuevoBarrioContainer').style.display = 'none';
 }
 
+/**
+ * Cierra el formulario de orden y reinicia sus campos
+ */
+function cerrarFormularioOrden() {
+    // Ocultar el formulario
+    document.getElementById('formOrdenContainer').style.display = 'none';
+    
+    // Reiniciar el formulario
+    document.getElementById('formOrden').reset();
+    
+    // Eliminar cualquier estilo de error en los campos
+    const inputs = document.querySelectorAll('#formOrden input, #formOrden select');
+    inputs.forEach(input => {
+        input.style.borderColor = '';
+    });
+    
+    // Ocultar campos condicionales
+    document.getElementById('campoRecibo').style.display = 'none';
+    document.getElementById('campoDependencia').style.display = 'none';
+}
+
+
+function cerrarFormularioVisita() {
+    // Ocultar el formulario
+    document.getElementById('formVisitaContainer').style.display = 'none';
+    
+    // Reiniciar el formulario
+    document.getElementById('formVisita').reset();
+    
+    // Eliminar cualquier estilo de error en los campos
+    const inputs = document.querySelectorAll('#formVisita input, #formVisita textarea');
+    inputs.forEach(input => {
+        input.style.borderColor = '';
+    });
+}
+
+// Opcionalmente: Función para cerrar cualquier formulario abierto cuando se presiona ESC
 document.addEventListener('keydown', function(event) {
     if (event.key === 'Escape') {
-        if (document.getElementById('formClienteContainer').style.display === 'block') {
+        if (document.getElementById('formClienteContainer').style.display !== 'none') {
             cerrarFormularioCliente();
-        } else if (document.getElementById('formOrdenContainer').style.display === 'block') {
+        } else if (document.getElementById('formOrdenContainer').style.display !== 'none') {
             cerrarFormularioOrden();
-        } else if (document.getElementById('formVisitaContainer').style.display === 'block') {
+        } else if (document.getElementById('formVisitaContainer').style.display !== 'none') {
             cerrarFormularioVisita();
         }
     }
 });
 
-window.onload = cargarEstadisticas;
+// Modificar la función window.onload para que cargue todos los clientes
+window.onload = function() {
+    cargarEstadisticas();
+    cargarTodosLosClientes(); // Añadir esta línea para mostrar todos los clientes al inicio
+};

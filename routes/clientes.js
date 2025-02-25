@@ -94,10 +94,31 @@ router.get('/buscar', async (req, res) => {
             FROM clientes c 
             LEFT JOIN barrios b ON c.id_barrio = b.id
             WHERE c.nombre LIKE ? OR c.dni LIKE ? OR c.direccion LIKE ? OR c.mail LIKE ? OR c.codigo LIKE ? OR b.nombre LIKE ?
+            ORDER BY c.nombre
         `, [`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`]);
+        console.log(`Búsqueda de clientes con término '${q}': ${rows.length} resultados`);
         res.json(rows);
     } catch (err) {
+        console.error('Error al buscar clientes:', err);
         res.status(500).json({ error: 'Error al buscar clientes' });
+    }
+});
+
+// Ruta para obtener todos los clientes
+router.get('/todos', async (req, res) => {
+    try {
+        console.log('Solicitud recibida para obtener todos los clientes');
+        const { rows } = await db.execute(`
+            SELECT c.*, b.nombre as barrio 
+            FROM clientes c 
+            LEFT JOIN barrios b ON c.id_barrio = b.id
+            ORDER BY c.nombre
+        `);
+        console.log(`Retornando ${rows.length} clientes`);
+        res.json(rows);
+    } catch (err) {
+        console.error('Error al obtener todos los clientes:', err);
+        res.status(500).json({ error: 'Error al obtener clientes' });
     }
 });
 
@@ -117,11 +138,12 @@ router.get('/:id/historial', async (req, res) => {
         }
         res.json(historial);
     } catch (err) {
+        console.error('Error al obtener historial:', err);
         res.status(500).json({ error: 'Error al obtener historial' });
     }
 });
 
-// Nuevo endpoint para verificar si un DNI ya existe
+// Ruta para verificar si un DNI ya existe
 router.get('/verificar-dni/:dni', async (req, res) => {
     const { dni } = req.params;
     try {
