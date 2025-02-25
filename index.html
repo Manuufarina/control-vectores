@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Control de Vectores - Órdenes de Trabajo</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=TU_CLAVE_API_AQUI&callback=initMap" async defer></script>
+</head>
+<body>
+    <h1>Gestión de Órdenes de Trabajo</h1>
+
+    <!-- Sección Clientes -->
+    <section id="clientes">
+        <h2>Clientes</h2>
+        <button class="material-btn" onclick="mostrarFormularioCliente()">
+            <span class="material-icons">person_add</span> Agregar Cliente
+        </button>
+        <div class="material-input">
+            <input type="text" id="buscarCliente" placeholder="Buscar por nombre, DNI, dirección, código o palabra clave" oninput="buscarCliente()">
+            <span class="material-icons search-icon">search</span>
+        </div>
+        <div id="listaClientes"></div>
+    </section>
+
+    <!-- Ficha del Cliente -->
+    <section id="fichaCliente" style="display:none;">
+        <h2>Ficha del Cliente</h2>
+        <div id="datosCliente" class="material-card"></div>
+        <div id="mapaCliente" class="map-container"></div>
+        <button class="material-btn" onclick="mostrarFormularioOrden()">
+            <span class="material-icons">add_circle</span> Crear Nueva Orden
+        </button>
+        <button class="material-btn" onclick="exportarCSV()">
+            <span class="material-icons">download</span> Exportar Órdenes a CSV
+        </button>
+        <h3>Historial de Órdenes</h3>
+        <div id="historialOrdenes"></div>
+    </section>
+
+    <!-- Formulario Cliente -->
+    <section id="formClienteContainer" class="material-form-container" style="display:none;">
+        <h2>Agregar Cliente</h2>
+        <form id="formCliente" class="material-form">
+            <div class="material-input">
+                <label>Nombre</label>
+                <input type="text" id="nombreCliente" required>
+            </div>
+            <div class="material-input">
+                <label>Dirección</label>
+                <input type="text" id="direccionCliente" required>
+            </div>
+            <div class="material-input">
+                <label>Barrio/Localidad</label>
+                <select id="barrioCliente">
+                    <option value="">Seleccione un barrio</option>
+                </select>
+                <div id="nuevoBarrioContainer" style="display:none; margin-top: 10px;">
+                    <input type="text" id="nuevoBarrio" placeholder="Nombre del nuevo barrio">
+                    <button type="button" class="material-btn" onclick="agregarBarrio()">
+                        <span class="material-icons">add</span> Agregar
+                    </button>
+                </div>
+                <button type="button" class="material-btn" onclick="toggleNuevoBarrio()">
+                    <span class="material-icons">add_location</span> Nuevo Barrio
+                </button>
+            </div>
+            <div class="material-input">
+                <label>Teléfono</label>
+                <input type="text" id="telefonoCliente">
+            </div>
+            <div class="material-input">
+                <label>Mail</label>
+                <input type="email" id="mailCliente">
+            </div>
+            <div class="material-input">
+                <label>DNI</label>
+                <input type="text" id="dniCliente" required>
+            </div>
+            <div class="material-input">
+                <label>Metros Cuadrados (m²)</label>
+                <input type="number" id="m2Cliente" step="0.01">
+            </div>
+            <button type="submit" class="material-btn primary">
+                <span class="material-icons">save</span> Guardar
+            </button>
+        </form>
+    </section>
+
+    <!-- Formulario Orden -->
+    <section id="formOrdenContainer" class="material-form-container" style="display:none;">
+        <h2 id="tituloFormOrden">Crear Orden de Trabajo</h2>
+        <form id="formOrden" class="material-form">
+            <input type="hidden" id="idClienteOrden">
+            <input type="hidden" id="idOrden">
+            <div class="material-input">
+                <label>Tipo de Servicio</label>
+                <select id="tipoServicio">
+                    <option value="desratizacion">Desratización</option>
+                    <option value="retiro_panal">Retiro de Panal</option>
+                    <option value="desinsectacion">Desinsectación</option>
+                    <option value="desinfeccion">Desinfección</option>
+                </select>
+            </div>
+            <div class="material-radio-group">
+                <label>Abonó</label>
+                <label><input type="radio" name="abono" value="sí"> Sí</label>
+                <label><input type="radio" name="abono" value="no"> No</label>
+            </div>
+            <div id="campoRecibo" class="material-input" style="display:none;">
+                <label>Número de Recibo</label>
+                <input type="text" id="numeroRecibo">
+            </div>
+            <div id="campoDependencia" class="material-input" style="display:none;">
+                <label>Dependencia Municipal</label>
+                <input type="text" id="dependencia">
+            </div>
+            <div class="material-input">
+                <label>Horario</label>
+                <input type="datetime-local" id="horario">
+            </div>
+            <div class="material-input">
+                <label>Técnicos</label>
+                <input type="text" id="tecnicos">
+            </div>
+            <div class="material-input">
+                <label>Estado</label>
+                <select id="estadoOrden">
+                    <option value="Pendiente">Pendiente</option>
+                    <option value="En Progreso">En Progreso</option>
+                    <option value="Completada">Completada</option>
+                </select>
+            </div>
+            <button type="submit" class="material-btn primary">
+                <span class="material-icons">save</span> Guardar
+            </button>
+        </form>
+    </section>
+
+    <!-- Formulario Visita -->
+    <section id="formVisitaContainer" class="material-form-container" style="display:none;">
+        <h2 id="tituloFormVisita">Agregar Visita</h2>
+        <form id="formVisita" class="material-form">
+            <input type="hidden" id="idOrdenVisita">
+            <input type="hidden" id="idVisita">
+            <div class="material-input">
+                <label>Fecha de Visita</label>
+                <input type="datetime-local" id="fechaVisita">
+            </div>
+            <div class="material-input">
+                <label>Observaciones</label>
+                <textarea id="observaciones"></textarea>
+            </div>
+            <button type="submit" class="material-btn primary">
+                <span class="material-icons">save</span> Guardar
+            </button>
+        </form>
+    </section>
+
+    <!-- Sección Estadísticas -->
+    <section id="estadisticas">
+        <h2>Estadísticas</h2>
+        <div class="material-filter">
+            <div class="material-input">
+                <label>Fecha Inicio</label>
+                <input type="date" id="fechaInicio">
+            </div>
+            <div class="material-input">
+                <label>Fecha Fin</label>
+                <input type="date" id="fechaFin">
+            </div>
+            <button class="material-btn" onclick="cargarEstadisticas()">
+                <span class="material-icons">filter_list</span> Filtrar
+            </button>
+        </div>
+        <div class="chart-container">
+            <canvas id="chartPagos"></canvas>
+        </div>
+        <div class="chart-container">
+            <canvas id="chartServicios"></canvas>
+        </div>
+        <div class="chart-container">
+            <canvas id="chartTecnicos"></canvas>
+        </div>
+    </section>
+
+    <!-- Contenedor de Notificaciones -->
+    <div id="notificationContainer" class="notification-container"></div>
+
+    <script src="scripts.js"></script>
+</body>
+</html>
