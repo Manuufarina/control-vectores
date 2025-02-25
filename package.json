@@ -1,0 +1,24 @@
+{
+    "name": "control-vectores-san-isidro",
+    "version": "1.0.0",
+    "description": "Sistema de gestión de órdenes de trabajo para Control de Vectores",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js",
+        "dev": "nodemon server.js"
+    },
+    "dependencies": {
+        "@libsql/client": "^0.10.0",
+        "cors": "^2.8.5",
+        "express": "^4.18.2",
+        "googleapis": "^114.0.0",
+        "json2csv": "^5.0.7",
+        "pdfkit": "^0.13.0"
+    },
+    "devDependencies": {
+        "nodemon": "^3.1.9"
+    },
+    "engines": {
+        "node": ">=14.0.0"
+    }
+}
